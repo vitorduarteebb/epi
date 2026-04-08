@@ -16,12 +16,14 @@ class PPEDetector:
         from ultralytics import YOLO
 
         w = Path(weights)
-        if not w.is_file():
+        load_path = str(w.resolve()) if w.is_file() else weights
+        try:
+            self._model = YOLO(load_path)
+        except Exception as e:
             raise FileNotFoundError(
-                f"Pesos do modelo não encontrados: {weights}. "
-                "Coloque um arquivo .pt treinado para EPI ou ajuste o caminho em config.yaml."
-            )
-        self._model = YOLO(str(w))
+                f"Não foi possível carregar o modelo: {weights}. "
+                "Coloque um .pt existente em model.weights ou ative model.fallback_yolov8n para teste."
+            ) from e
         self._imgsz = imgsz
         self._conf = conf
         self._device = device

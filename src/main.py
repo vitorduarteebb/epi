@@ -108,11 +108,20 @@ def main() -> int:
     model_cfg = cfg.get("model", {})
     weights = model_cfg.get("weights", "models/ppe.pt")
     if not Path(weights).is_file():
-        log.error(
-            "Configure model.weights em config.yaml para um arquivo .pt existente. "
-            "Treine ou exporte um modelo YOLOv8 para EPI (Roboflow, dataset próprio)."
-        )
-        return 1
+        if model_cfg.get("fallback_yolov8n"):
+            weights = "yolov8n.pt"
+            log.warning(
+                "model.fallback_yolov8n=true: a usar yolov8n.pt (COCO). "
+                "Isto só valida o pipeline; para EPI real use um .pt treinado e fallback_yolov8n: false."
+            )
+        else:
+            log.error(
+                "Ficheiro de pesos inexistente: %s. "
+                "Coloque o modelo em models/, ou defina model.fallback_yolov8n: true para testar com yolov8n.pt (download automático). "
+                "Para produção, treine/exporte um YOLOv8 para EPI (ex.: Roboflow).",
+                weights,
+            )
+            return 1
 
     detector = PPEDetector(
         weights=weights,

@@ -8,8 +8,10 @@ cameras:
 
 model:
   # Caminho para um .pt treinado em EPI (capacete, colete, etc.). Coloque seu modelo em models/
-  # Para testar o pipeline sem modelo customizado, use yolov8n.pt (não detecta EPI de forma confiável)
   weights: "models/ppe.pt"
+  # Se true e o ficheiro em weights não existir, usa yolov8n.pt (download automático pela Ultralytics).
+  # Apenas para testar pipeline na VPS; não é modelo de EPI — em produção use fallback_yolov8n: false.
+  fallback_yolov8n: false
   imgsz: 640
   confidence: 0.45
   device: null  # null = auto (cuda se disponível)
