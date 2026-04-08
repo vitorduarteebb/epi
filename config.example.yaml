@@ -1,0 +1,45 @@
+# Copie para config.yaml e ajuste. RTSP é o padrão mais comum em DVR/NVR (Hikvision, Intelbras, etc.).
+
+cameras:
+  - id: linha_montagem_01
+    # Exemplo RTSP — substitua usuário, senha, IP e canal conforme o manual do equipamento
+    url: "rtsp://usuario:senha@192.168.1.100:554/Streaming/Channels/101"
+    enabled: true
+
+model:
+  # Caminho para um .pt treinado em EPI (capacete, colete, etc.). Coloque seu modelo em models/
+  # Para testar o pipeline sem modelo customizado, use yolov8n.pt (não detecta EPI de forma confiável)
+  weights: "models/ppe.pt"
+  imgsz: 640
+  confidence: 0.45
+  device: null  # null = auto (cuda se disponível)
+
+# Nomes de classe dependem do modelo treinado (veja no Roboflow / treinamento).
+# Modo A — alerta se aparecer uma destas classes (ex.: modelos que marcam "sem capacete")
+detection:
+  mode: violation_classes
+  violation_classes:
+    - "NO-Hardhat"
+    - "NO-Safety Vest"
+    - "no_helmet"
+    - "Without Helmet"
+  # Modo B — descomente e ajuste se seu modelo só lista o que está certo (capacete, colete)
+  # mode: missing_when_person
+  # person_class: "person"
+  # required_any_of:
+  #   - "helmet"
+  #   - "Hardhat"
+  #   - "Safety Vest"
+
+processing:
+  # Processar 1 frame a cada N frames (reduz CPU/GPU)
+  frame_stride: 5
+  # Cooldown entre alertas iguais (segundos) por câmera
+  alert_cooldown_seconds: 30
+
+alerts:
+  log_to_console: true
+  log_file: "logs/alertas.log"
+  # Opcional: enviar POST JSON para seu sistema (n8n, webhook, API interna)
+  webhook_url: null
+  # webhook_url: "https://seu-servidor.com/api/epi-alerta"
