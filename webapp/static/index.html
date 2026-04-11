@@ -7,63 +7,146 @@
   <link rel="stylesheet" href="/static/styles.css" />
 </head>
 <body>
-  <header>
-    <h1>Monitor EPI</h1>
-    <span class="badge">Painel local · sem APIs de IA externas</span>
+  <header class="site-header">
+    <div class="brand">
+      <h1>Monitor EPI</h1>
+      <span class="badge">Treino local · métricas em tempo real</span>
+    </div>
+    <button type="button" class="btn-refresh" id="btn-refresh-stats" title="Atualizar estatísticas">↻ Atualizar</button>
   </header>
-  <nav>
-    <button type="button" class="active" data-tab="train">Treino (vídeo)</button>
-    <button type="button" data-tab="live">Tempo real (câmera)</button>
+  <nav class="tabs">
+    <button type="button" class="active" data-tab="train">Treino &amp; métricas</button>
+    <button type="button" data-tab="live">Tempo real</button>
   </nav>
+
   <main>
     <section id="panel-train" class="panel active">
-      <div class="card">
-        <h2>1. Enviar vídeo</h2>
-        <form id="upload-form">
-          <label>Ficheiro (mp4, avi, mkv, mov, webm)</label>
-          <input id="file-input" type="file" accept="video/*" />
-          <button type="submit" class="primary">Enviar</button>
-        </form>
-        <p id="upload-msg" class="msg"></p>
+      <!-- KPIs -->
+      <div class="stats-grid" id="stats-kpis">
+        <article class="stat-card accent">
+          <span class="stat-label">Taxa de acerto (global)</span>
+          <strong class="stat-value" id="kpi-accuracy">—</strong>
+          <span class="stat-hint">Correto ÷ total de etiquetas</span>
+        </article>
+        <article class="stat-card">
+          <span class="stat-label">Etiquetas totais</span>
+          <strong class="stat-value" id="kpi-total">0</strong>
+          <span class="stat-hint">Frames avaliados por ti</span>
+        </article>
+        <article class="stat-card ok">
+          <span class="stat-label">Correto</span>
+          <strong class="stat-value" id="kpi-ok">0</strong>
+        </article>
+        <article class="stat-card bad">
+          <span class="stat-label">Incorreto</span>
+          <strong class="stat-value" id="kpi-bad">0</strong>
+        </article>
+        <article class="stat-card">
+          <span class="stat-label">Últimos <span id="kpi-roll-n">50</span> (tendência)</span>
+          <strong class="stat-value" id="kpi-rolling">—</strong>
+          <span class="stat-hint">Acerto nos registos mais recentes</span>
+        </article>
       </div>
-      <div class="card">
-        <h2>2. Escolher vídeo e frame</h2>
-        <p class="msg">Clique num vídeo na lista. Carregue frames e diga se a deteção está certa — os dados ficam na base local (<code>data/web_feedback.db</code>) para futuras exportações / retreino.</p>
-        <ul id="video-list" class="video-list"></ul>
-        <div class="row">
-          <div>
-            <label>Índice do frame (saltar de 5 em 5 com os botões)</label>
-            <input id="frame-idx" type="number" min="0" value="0" />
+
+      <div class="progress-global">
+        <div class="progress-label"><span>Progresso da validação</span><span id="progress-pct">0%</span></div>
+        <div class="progress-track"><div class="progress-fill" id="progress-fill" style="width:0%"></div></div>
+      </div>
+
+      <div class="layout-split">
+        <div class="col-left">
+          <div class="card">
+            <h2><span class="step">1</span> Enviar vídeo</h2>
+            <p class="lead">Arrasta o ficheiro ou clica para escolher. Formatos: mp4, avi, mkv, mov, webm (máx. 500 MB).</p>
+            <label class="drop-zone" id="drop-zone">
+              <input id="file-input" type="file" accept="video/*" hidden />
+              <span class="drop-icon">⬆</span>
+              <span class="drop-text" id="drop-text">Solta o vídeo aqui ou clica para procurar</span>
+            </label>
+            <form id="upload-form">
+              <button type="submit" class="primary full-width" id="btn-upload">Enviar vídeo</button>
+            </form>
+            <p id="upload-msg" class="msg"></p>
           </div>
-          <button type="button" class="ghost" id="btn-prev">− 5</button>
-          <button type="button" class="ghost" id="btn-next">+ 5</button>
-          <button type="button" class="primary" id="btn-load-frame">Carregar frame</button>
+
+          <div class="card">
+            <h2><span class="step">2</span> Vídeos na base</h2>
+            <ul id="video-list" class="video-list"></ul>
+            <p class="empty-hint" id="video-empty">Nenhum vídeo ainda. Envia um ficheiro acima.</p>
+          </div>
+
+          <div class="card">
+            <h2>Atividade por dia</h2>
+            <p class="lead small">Volume de etiquetas guardadas (últimos dias com dados).</p>
+            <div class="bar-chart" id="daily-chart"></div>
+          </div>
+
+          <div class="card">
+            <h2>Por vídeo</h2>
+            <div class="table-wrap">
+              <table class="data-table" id="table-videos">
+                <thead>
+                  <tr><th>Vídeo</th><th>Etiquetas</th><th>Correto</th><th>Erro</th><th>Acerto</th></tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+            <p class="empty-hint" id="table-empty">Sem dados — após etiquetar frames, as percentagens aparecem aqui.</p>
+          </div>
         </div>
-        <img id="preview" class="preview" alt="Pré-visualização" />
-        <p id="train-msg" class="msg"></p>
-        <div class="row">
-          <label>Notas (opcional)</label>
-          <input id="notes" type="text" placeholder="Ex.: capacete não visível" />
+
+        <div class="col-right">
+          <div class="card sticky-card">
+            <h2><span class="step">3</span> Frame &amp; validação</h2>
+            <p class="lead small">Escolhe um vídeo à esquerda. Ajusta o índice do frame e carrega. Confirma se a IA acertou nas caixas.</p>
+            <div class="frame-controls">
+              <label>Índice do frame</label>
+              <div class="row tight">
+                <button type="button" class="ghost" id="btn-prev" title="−5">−5</button>
+                <input id="frame-idx" type="number" min="0" value="0" />
+                <button type="button" class="ghost" id="btn-next" title="+5">+5</button>
+                <button type="button" class="primary" id="btn-load-frame">Carregar</button>
+              </div>
+            </div>
+            <div class="preview-wrap">
+              <img id="preview" class="preview" alt="Pré-visualização" />
+              <div class="preview-placeholder" id="preview-ph">Seleciona um vídeo e carrega um frame</div>
+            </div>
+            <p id="train-msg" class="msg"></p>
+            <label>Notas (opcional)</label>
+            <input id="notes" type="text" placeholder="Ex.: capacete fora do enquadramento" />
+            <div class="actions-feedback">
+              <button type="button" class="btn-ok" id="btn-ok">✓ Correto</button>
+              <button type="button" class="btn-bad" id="btn-bad">✗ Incorreto</button>
+            </div>
+            <details class="json-details">
+              <summary>Deteções (JSON)</summary>
+              <pre id="detections-json" class="det-json">[]</pre>
+            </details>
+          </div>
+
+          <div class="card">
+            <h2>Histórico recente</h2>
+            <div class="feedback-table-wrap">
+              <table class="data-table compact" id="table-recent">
+                <thead>
+                  <tr><th>Quando</th><th>Vídeo</th><th>Frame</th><th>Resultado</th></tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
         </div>
-        <div class="row">
-          <button type="button" class="primary" id="btn-ok" style="background: var(--ok)">Correto</button>
-          <button type="button" class="danger" id="btn-bad">Incorreto</button>
-        </div>
-        <h2>Deteções (JSON)</h2>
-        <pre id="detections-json" class="det-json">[]</pre>
-      </div>
-      <div class="card">
-        <h2>Último feedback</h2>
-        <div id="feedback-list"></div>
       </div>
     </section>
+
     <section id="panel-live" class="panel">
       <div class="card">
         <h2>Stream em tempo real</h2>
-        <p class="msg">Cole a URL RTSP do NVR/câmera ou um caminho absoluto para um ficheiro .mp4 na máquina (ex.: <code>/opt/epi/samples/video_teste.mp4</code>). O servidor lê o vídeo e aplica o modelo YOLO localmente.</p>
-        <label>URL RTSP ou caminho do ficheiro</label>
-        <input id="live-url" type="text" placeholder="rtsp://usuario:senha@IP:554/..." />
-        <div class="row">
+        <p class="lead">URL RTSP do NVR/câmera ou caminho absoluto de um .mp4 no servidor (ex.: <code>/opt/epi/samples/video_teste.mp4</code>).</p>
+        <label>URL ou ficheiro</label>
+        <input id="live-url" type="text" placeholder="rtsp://… ou /caminho/video.mp4" />
+        <div class="row tight">
           <button type="button" class="primary" id="btn-live-start">Iniciar</button>
           <button type="button" class="ghost" id="btn-live-stop">Parar</button>
         </div>
@@ -74,6 +157,9 @@
       </div>
     </section>
   </main>
+  <footer class="site-footer">
+    <span>Dados em <code>data/web_feedback.db</code> · sem APIs de IA na nuvem</span>
+  </footer>
   <script src="/static/app.js"></script>
 </body>
 </html>

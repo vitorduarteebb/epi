@@ -18,6 +18,8 @@ python -m uvicorn webapp.app:app --host 0.0.0.0 --port 8090
 
 Abre no browser: `http://SEU_IP:8090` (na VPS abre também a porta **8090** no firewall / painel do hosting).
 
+O painel de **Treino** mostra: taxa de acerto global, totais (correto/incorreto), tendência nos últimos até 50 registos, gráfico de atividade por dia, tabela por vídeo e histórico recente — dados vêm de `data/web_feedback.db` (endpoint `GET /api/stats`).
+
 O monitor em linha de comando (`python -m src.main`) e o painel são **serviços separados**; podes usar só um deles ou os dois (portas diferentes: 8080 health do CLI vs 8090 painel).
 
 ## Uso rápido

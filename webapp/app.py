@@ -90,6 +90,11 @@ def list_videos() -> JSONResponse:
     return JSONResponse({"videos": db.list_videos()})
 
 
+@app.get("/api/stats")
+def training_stats() -> JSONResponse:
+    return JSONResponse(db.get_training_stats())
+
+
 @app.get("/api/video/{video_id}/frame/{frame_idx}")
 def get_frame(video_id: str, frame_idx: int) -> JSONResponse:
     row = db.get_video(video_id)
