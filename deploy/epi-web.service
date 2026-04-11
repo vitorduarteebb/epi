@@ -1,0 +1,14 @@
+[Unit]
+Description=Monitor EPI — painel FastAPI (uvicorn)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/epi
+Environment=PATH=/opt/epi/.venv/bin:/usr/local/bin:/usr/bin
+ExecStart=/opt/epi/.venv/bin/python -m uvicorn webapp.app:app --host 0.0.0.0 --port 8090
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

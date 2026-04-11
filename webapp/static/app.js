@@ -47,6 +47,16 @@ function httpErrorMessage(r, j, text) {
   let msg = errDetail(j.detail || j) || (text || "").trim();
   if (r.status === 404) {
     if (msg === "Not Found" || !msg) {
+      const port = typeof location !== "undefined" ? location.port : "";
+      const same8090 = port === "8090" || (getApiBase() || "").includes(":8090");
+      if (same8090) {
+        return (
+          "404 na porta 8090: o processo que escuta aqui NÃO é o uvicorn deste projeto " +
+          "(ou está desatualizado). Na VPS SSH: cd /opt/epi && source .venv/bin/activate && " +
+          "fuser -k 8090/tcp ; python -m uvicorn webapp.app:app --host 0.0.0.0 --port 8090. " +
+          "Teste: curl -s http://127.0.0.1:8090/openapi.json | head -c 80"
+        );
+      }
       return (
         "404: esta origem não tem a API FastAPI (rota em falta). " +
         "Abre o painel diretamente em http://IP:8090 ou define no HTML " +
@@ -65,8 +75,12 @@ let state = {
   lastDetections: [],
 };
 
-/** false se GET /api/health não for 200 (servidor não é o uvicorn do painel). */
+/** false se GET /api/health não for JSON válido do painel (service=epi-web). */
 let apiServerOk = true;
+
+/** Após 404 em /api/stats, deixa de repetir pedidos ao minuto. */
+let statsPollDisabled = false;
+let statsIntervalId = null;
 
 function setPreviewHasImage(on) {
   const w = $(".preview-wrap");
@@ -198,7 +212,18 @@ async function loadModelStrip() {
 async function verifyApiServer() {
   try {
     const r = await fetch(apiUrl("/api/health"));
-    if (r.ok) {
+    const text = await r.text();
+    let j = {};
+    try {
+      if (text) j = JSON.parse(text);
+    } catch (_) {
+      /* não é JSON — proxy/página a fingir 200 */
+    }
+    const isEpi =
+      r.ok &&
+      j &&
+      (j.service === "epi-web" || j.ok === "true");
+    if (isEpi) {
       apiServerOk = true;
       return true;
     }
@@ -207,12 +232,20 @@ async function verifyApiServer() {
   }
   apiServerOk = false;
   const b = $("#server-banner");
-  if (b) b.hidden = false;
+  if (b) {
+    b.hidden = false;
+    b.innerHTML =
+      "<strong>API inválida ou em falta:</strong> <code>GET /api/health</code> tem de devolver JSON " +
+      '<code>{"ok":"true","service":"epi-web"}</code>. Se vês 200 mas HTML ou outro serviço, o processo na porta não é o uvicorn certo. ' +
+      "Na VPS: <code>cd /opt/epi && source .venv/bin/activate && fuser -k 8090/tcp</code> e depois " +
+      "<code>python -m uvicorn webapp.app:app --host 0.0.0.0 --port 8090</code>. " +
+      "Confirma: <code>curl -s http://127.0.0.1:8090/api/health</code>";
+  }
   return false;
 }
 
 async function loadStats() {
-  if (!apiServerOk) return;
+  if (!apiServerOk || statsPollDisabled) return;
   try {
     const r = await fetch(apiUrl("/api/stats"));
     const text = await r.text();
@@ -221,7 +254,24 @@ async function loadStats() {
       if (text) s = JSON.parse(text);
     } catch (_) {}
     if (!r.ok) {
-      console.error(httpErrorMessage(r, s, text));
+      if (r.status === 404) {
+        statsPollDisabled = true;
+        if (statsIntervalId != null) {
+          clearInterval(statsIntervalId);
+          statsIntervalId = null;
+        }
+        apiServerOk = false;
+        const b = $("#server-banner");
+        if (b) {
+          b.hidden = false;
+          b.innerHTML =
+            "<strong>/api/stats devolveu 404:</strong> o uvicorn do projeto não está a servir esta porta " +
+            "(ou outro programa ocupa a 8090). " +
+            escapeHtml(httpErrorMessage(r, s, text));
+        }
+      } else {
+        console.error(httpErrorMessage(r, s, text));
+      }
       return;
     }
 
@@ -566,7 +616,14 @@ $("#upload-form").addEventListener("submit", async (e) => {
   loadFrame();
 });
 
-$("#btn-refresh-stats").addEventListener("click", () => loadStats());
+$("#btn-refresh-stats").addEventListener("click", async () => {
+  statsPollDisabled = false;
+  apiServerOk = true;
+  await loadStats();
+  if (!statsPollDisabled && apiServerOk && statsIntervalId == null) {
+    statsIntervalId = setInterval(loadStats, 60000);
+  }
+});
 
 $("#btn-live-start").addEventListener("click", async () => {
   const url = $("#live-url").value.trim();
@@ -598,5 +655,7 @@ $("#btn-live-stop").addEventListener("click", async () => {
   await loadModelStrip();
   await refreshVideos();
   await loadStats();
-  setInterval(loadStats, 60000);
+  if (!statsPollDisabled && apiServerOk) {
+    statsIntervalId = setInterval(loadStats, 60000);
+  }
 })();
