@@ -476,6 +476,27 @@ ul.video-list li.selected {
 }
 .model-strip code { color: var(--accent); }
 
+.frame-headline {
+  margin-bottom: 0.85rem;
+  padding: 0.85rem 1rem;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.12), rgba(139, 92, 246, 0.08));
+  border: 1px solid rgba(59, 130, 246, 0.35);
+  border-radius: var(--radius);
+}
+.frame-headline-main {
+  margin: 0 0 0.4rem;
+  font-size: 1.05rem;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--text);
+}
+.frame-headline-sub {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
 .insight-banner {
   border-radius: var(--radius);
   padding: 0.9rem 1rem;

@@ -33,6 +33,15 @@ function setPreviewHasImage(on) {
 }
 
 function renderInsight(summary) {
+  const head = $("#frame-headline");
+  if (summary && summary.headline_pt) {
+    head.hidden = false;
+    head.querySelector(".frame-headline-main").textContent = summary.headline_pt;
+    head.querySelector(".frame-headline-sub").textContent = summary.subline_pt || "";
+  } else {
+    head.hidden = true;
+  }
+
   const box = $("#insight-banner");
   if (!summary || !summary.banner_title) {
     box.hidden = true;
@@ -224,6 +233,7 @@ async function loadFrame() {
     setPreviewHasImage(false);
     $("#preview").removeAttribute("src");
     $("#insight-banner").hidden = true;
+    $("#frame-headline").hidden = true;
     return;
   }
   const idx = parseInt($("#frame-idx").value || "0", 10);
@@ -244,6 +254,8 @@ async function loadFrame() {
     $("#train-msg").textContent = "Erro: " + e.message;
     $("#train-msg").classList.add("error");
     setPreviewHasImage(false);
+    $("#frame-headline").hidden = true;
+    $("#insight-banner").hidden = true;
   }
 }
 
