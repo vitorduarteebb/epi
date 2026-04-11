@@ -4,9 +4,16 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Monitor EPI — Treino &amp; Tempo real</title>
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml" />
   <link rel="stylesheet" href="/static/styles.css" />
 </head>
 <body>
+  <div id="server-banner" class="server-banner" hidden>
+    <strong>Servidor errado na porta 8090:</strong> as rotas <code>/api/*</code> não existem neste processo
+    (por isso vês 404). O painel tem de ser o <strong>FastAPI</strong> do projeto. Na VPS, na pasta do projeto, com venv ativo:
+    <code>python -m uvicorn webapp.app:app --host 0.0.0.0 --port 8090</code>
+    — não uses <code>python -m http.server</code> nem só ficheiros estáticos. Se usas nginx, faz proxy de <code>/api</code> e <code>/static</code> para o uvicorn.
+  </div>
   <header class="site-header">
     <div class="brand">
       <h1>Monitor EPI</h1>
@@ -123,6 +130,20 @@
                 <button type="button" class="ghost" id="btn-next" title="+5">+5</button>
                 <button type="button" class="primary" id="btn-load-frame">Carregar</button>
               </div>
+            </div>
+            <div class="full-video-block">
+              <p class="lead small">
+                <strong>Análise do vídeo completo:</strong> percorre o ficheiro (amostrando frames, não frame a frame)
+                e devolve <strong>um relatório único</strong> com totais e texto em português.
+              </p>
+              <div class="row tight full-video-controls">
+                <label class="inline-label">Saltar</label>
+                <input id="full-stride" type="number" min="1" max="600" value="30" title="Frames a saltar entre cada inferência (ex.: 30 ≈ 1 s a 30 fps)" />
+                <label class="inline-label">Máx. inferências</label>
+                <input id="full-max" type="number" min="1" max="5000" value="400" title="Limite para vídeos longos (evita bloquear o servidor)" />
+                <button type="button" class="primary" id="btn-analyze-full">Analisar vídeo inteiro</button>
+              </div>
+              <div id="full-report" class="full-report" hidden></div>
             </div>
             <div class="preview-wrap">
               <img id="preview" class="preview" alt="Pré-visualização" />

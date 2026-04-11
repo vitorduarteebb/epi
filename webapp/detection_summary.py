@@ -227,3 +227,8 @@ def build_summary(
             **cats,
         },
     }
+
+
+def count_detection_categories(detections: list[dict[str, Any]]) -> dict[str, int]:
+    """Agrega contagens por tipo de classe (uso em análise de vídeo completo)."""
+    return _count_categories(detections)

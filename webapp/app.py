@@ -8,7 +8,7 @@ from typing import Any
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -16,6 +16,7 @@ from webapp import db
 from webapp import live_session
 from webapp.detection_summary import build_summary
 from webapp.detector_service import get_model_info, predict_frame
+from webapp.video_analyze import analyze_full_video
 from webapp.video_util import draw_detections, encode_jpeg, read_frame
 
 logging.basicConfig(level=logging.INFO)
@@ -46,6 +47,12 @@ def index() -> FileResponse:
     return FileResponse(STATIC / "index.html")
 
 
+@app.get("/favicon.ico")
+def favicon() -> RedirectResponse:
+    """Evita 404 no browser quando pede /favicon.ico na raiz."""
+    return RedirectResponse(url="/static/favicon.svg", status_code=307)
+
+
 app.mount("/static", StaticFiles(directory=str(STATIC)), name="static")
 
 
@@ -58,6 +65,11 @@ class FeedbackBody(BaseModel):
 
 class LiveStartBody(BaseModel):
     url: str = Field(min_length=3)
+
+
+class AnalyzeFullBody(BaseModel):
+    frame_stride: int = Field(default=30, ge=1, le=600)
+    max_frames: int = Field(default=400, ge=1, le=5000)
 
 
 @app.post("/api/upload")
@@ -143,6 +155,30 @@ def get_frame(video_id: str, frame_idx: int) -> JSONResponse:
             },
         }
     )
+
+
+@app.post("/api/video/{video_id}/analyze-full")
+def analyze_video_full(
+    video_id: str,
+    body: AnalyzeFullBody = AnalyzeFullBody(),
+) -> JSONResponse:
+    """Amostra o vídeo inteiro e devolve um relatório agregado (não só um frame)."""
+    row = db.get_video(video_id)
+    if not row:
+        raise HTTPException(404, "Vídeo não encontrado")
+    path = Path(row["path"])
+    if not path.is_file():
+        raise HTTPException(404, "Ficheiro em falta no disco")
+    stride = body.frame_stride
+    mxf = body.max_frames
+    try:
+        report = analyze_full_video(path, frame_stride=stride, max_frames=mxf)
+    except RuntimeError as e:
+        raise HTTPException(400, str(e)) from e
+    except Exception as e:
+        log.exception("analyze-full")
+        raise HTTPException(500, str(e)) from e
+    return JSONResponse(report)
 
 
 @app.post("/api/video/{video_id}/feedback")

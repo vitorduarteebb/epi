@@ -26,6 +26,9 @@ let state = {
   lastDetections: [],
 };
 
+/** false se GET /api/health não for 200 (servidor não é o uvicorn do painel). */
+let apiServerOk = true;
+
 function setPreviewHasImage(on) {
   const w = $(".preview-wrap");
   if (on) w.classList.add("has-image");
@@ -63,6 +66,7 @@ function renderInsight(summary) {
 }
 
 async function loadModelStrip() {
+  if (!apiServerOk) return;
   const strip = $("#model-strip");
   try {
     const r = await fetch("/api/model-info");
@@ -91,7 +95,24 @@ async function loadModelStrip() {
   }
 }
 
+async function verifyApiServer() {
+  try {
+    const r = await fetch("/api/health");
+    if (r.ok) {
+      apiServerOk = true;
+      return true;
+    }
+  } catch (e) {
+    /* rede / offline */
+  }
+  apiServerOk = false;
+  const b = $("#server-banner");
+  if (b) b.hidden = false;
+  return false;
+}
+
 async function loadStats() {
+  if (!apiServerOk) return;
   try {
     const r = await fetch("/api/stats");
     const s = await r.json();
@@ -260,6 +281,58 @@ async function loadFrame() {
 }
 
 $("#btn-load-frame").addEventListener("click", () => loadFrame());
+
+async function analyzeFullVideo() {
+  $("#train-msg").classList.remove("error");
+  if (!state.videoId) {
+    $("#train-msg").textContent = "Selecione um vídeo na lista.";
+    return;
+  }
+  const box = $("#full-report");
+  box.hidden = false;
+  box.className = "full-report loading";
+  box.innerHTML =
+    "<p class=\"msg\">A analisar o vídeo (várias inferências)… pode demorar.</p>";
+  const btn = $("#btn-analyze-full");
+  btn.disabled = true;
+  const stride = Math.max(1, parseInt($("#full-stride").value || "30", 10));
+  const maxFrames = Math.max(1, parseInt($("#full-max").value || "400", 10));
+  try {
+    const r = await fetch(`/api/video/${state.videoId}/analyze-full`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ frame_stride: stride, max_frames: maxFrames }),
+    });
+    const j = await r.json();
+    if (!r.ok) throw new Error(errDetail(j.detail || j));
+
+    const mi = j.model_info || {};
+    const fb = mi.using_fallback_yolov8n ? " (modelo COCO / fallback)" : "";
+    const trunc = j.truncated
+      ? `<p class="msg warn">Análise truncada: limite de ${j.max_frames_limit} inferências; aumenta o salto ou o máximo se precisares de mais cobertura.</p>`
+      : "";
+
+    box.className = "full-report";
+    box.innerHTML = `
+      <h3 class="full-report-title">Relatório do vídeo completo</h3>
+      <p class="full-report-meta"><code>${escapeHtml(String(mi.weights_effective || "?"))}</code>${escapeHtml(fb)} · ${j.frames_sampled} frame(s) amostrado(s) · stride ${j.frame_stride}</p>
+      <p class="full-report-main">${escapeHtml(j.report_pt || "")}</p>
+      <p class="full-report-detail">${escapeHtml(j.detail_pt || "")}</p>
+      ${trunc}
+      <details class="json-details"><summary>Totais (JSON)</summary><pre class="det-json">${escapeHtml(JSON.stringify(j.aggregated || {}, null, 2))}</pre></details>
+    `;
+    $("#train-msg").textContent = "Relatório global do vídeo pronto (abaixo).";
+  } catch (e) {
+    box.className = "full-report";
+    box.innerHTML = `<p class="msg error">${escapeHtml(e.message)}</p>`;
+    $("#train-msg").textContent = "Erro na análise completa: " + e.message;
+    $("#train-msg").classList.add("error");
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+$("#btn-analyze-full").addEventListener("click", () => analyzeFullVideo());
 $("#btn-prev").addEventListener("click", () => {
   const v = Math.max(0, parseInt($("#frame-idx").value || "0", 10) - 5);
   $("#frame-idx").value = v;
@@ -331,6 +404,12 @@ dropZone.addEventListener("drop", (e) => {
 
 $("#upload-form").addEventListener("submit", async (e) => {
   e.preventDefault();
+  if (!apiServerOk) {
+    $("#upload-msg").textContent =
+      "Servidor API indisponível. Usa uvicorn (ver faixa no topo ou README).";
+    $("#upload-msg").classList.add("error");
+    return;
+  }
   const f = fileInput.files[0];
   if (!f) {
     $("#upload-msg").textContent = "Escolhe um ficheiro de vídeo.";
@@ -388,6 +467,8 @@ $("#btn-live-stop").addEventListener("click", async () => {
 });
 
 (async function init() {
+  await verifyApiServer();
+  if (!apiServerOk) return;
   await loadModelStrip();
   await refreshVideos();
   await loadStats();

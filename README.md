@@ -7,6 +7,7 @@ Serviço em Python que lê streams RTSP (NVR/câmeras IP), executa detecção co
 Interface **local** (FastAPI) — sem chamadas a APIs de IA na nuvem: o modelo corre na tua máquina/VPS.
 
 - **Treino:** envia vídeos, vê deteções frame a frame e marca **Correto** / **Incorreto** (grava em SQLite para futura exportação/retreino).
+- **Vídeo inteiro:** botão **Analisar vídeo inteiro** (ou `POST /api/video/{id}/analyze-full`) amostra o ficheiro e devolve **um relatório agregado** em português (não substitui a vista frame a frame).
 - **Tempo real:** indica URL RTSP ou caminho de um `.mp4` no servidor; vê o fluxo com caixas desenhadas (MJPEG).
 
 Na raiz do projeto, com `config.yaml` e venv ativo:
@@ -17,6 +18,8 @@ python -m uvicorn webapp.app:app --host 0.0.0.0 --port 8090
 ```
 
 Abre no browser: `http://SEU_IP:8090` (na VPS abre também a porta **8090** no firewall / painel do hosting).
+
+**Se no browser vires 404 em `/api/stats` ou `/api/model-info`:** o processo na porta 8090 **não** é o uvicorn deste painel. Exemplos típicos: `python -m http.server 8090` (só ficheiros estáticos), ou nginx a servir HTML sem fazer **proxy** de `/api` e `/static` para o uvicorn. Solução: na raiz do projeto, com venv ativo, `python -m uvicorn webapp.app:app --host 0.0.0.0 --port 8090`. Confirma com `curl http://127.0.0.1:8090/api/health` — deve devolver JSON com `service: epi-web`.
 
 O painel de **Treino** mostra: taxa de acerto global, totais (correto/incorreto), tendência nos últimos até 50 registos, gráfico de atividade por dia, tabela por vídeo e histórico recente — dados vêm de `data/web_feedback.db` (endpoint `GET /api/stats`).
 
