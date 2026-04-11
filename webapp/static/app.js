@@ -42,7 +42,7 @@ function apiUrl(path) {
   return b ? b + p : p;
 }
 
-/** Mensagem útil quando a API responde 404 (rota em falta vs recurso). */
+/** Mensagem curta quando a API responde 404 (rota em falta vs recurso). */
 function httpErrorMessage(r, j, text) {
   let msg = errDetail(j.detail || j) || (text || "").trim();
   if (r.status === 404) {
@@ -51,17 +51,13 @@ function httpErrorMessage(r, j, text) {
       const same8090 = port === "8090" || (getApiBase() || "").includes(":8090");
       if (same8090) {
         return (
-          "404 na porta 8090: o processo que escuta aqui NÃO é o uvicorn deste projeto " +
-          "(ou está desatualizado). Na VPS SSH: cd /opt/epi && source .venv/bin/activate && " +
-          "fuser -k 8090/tcp ; python -m uvicorn webapp.app:app --host 0.0.0.0 --port 8090. " +
-          "Teste: curl -s http://127.0.0.1:8090/openapi.json | head -c 80"
+          "404: na VPS o painel responde (curl 127.0.0.1) mas este URL falha do browser — " +
+          "firewall/WAF ou proxy a bloquear este caminho. Testa no teu PC: curl URL desta página. " +
+          "O servidor tem rotas alternativas /api/metrics e POST /api/analyze-full (git pull)."
         );
       }
       return (
-        "404: esta origem não tem a API FastAPI (rota em falta). " +
-        "Abre o painel diretamente em http://IP:8090 ou define no HTML " +
-        '<meta name="epi-api-base" content="http://IP:8090"> se o site estiver noutra porta. ' +
-        "Na VPS: git pull + reinicia o uvicorn."
+        "404: API não encontrada nesta origem. Abre http://IP:8090 ou meta epi-api-base. Ver README."
       );
     }
   }
@@ -183,8 +179,15 @@ async function loadModelStrip() {
   if (!apiServerOk) return;
   const strip = $("#model-strip");
   try {
-    const r = await fetch(apiUrl("/api/model-info"));
-    const m = await r.json();
+    let r = await fetch(apiUrl("/api/model-info"));
+    if (r.status === 404) {
+      r = await fetch(apiUrl("/api/model"));
+    }
+    const text = await r.text();
+    let m = {};
+    try {
+      if (text) m = JSON.parse(text);
+    } catch (_) {}
     if (!r.ok) return;
     strip.hidden = false;
     const fb = m.using_fallback_yolov8n ? " (fallback yolov8n)" : "";
@@ -247,7 +250,10 @@ async function verifyApiServer() {
 async function loadStats() {
   if (!apiServerOk || statsPollDisabled) return;
   try {
-    const r = await fetch(apiUrl("/api/stats"));
+    let r = await fetch(apiUrl("/api/stats"));
+    if (r.status === 404) {
+      r = await fetch(apiUrl("/api/metrics"));
+    }
     const text = await r.text();
     let s = {};
     try {
@@ -265,8 +271,7 @@ async function loadStats() {
         if (b) {
           b.hidden = false;
           b.innerHTML =
-            "<strong>/api/stats devolveu 404:</strong> o uvicorn do projeto não está a servir esta porta " +
-            "(ou outro programa ocupa a 8090). " +
+            "<strong>API bloqueada ou 404:</strong> " +
             escapeHtml(httpErrorMessage(r, s, text));
         }
       } else {
@@ -458,16 +463,32 @@ async function analyzeFullVideo() {
   const stride = Math.max(1, parseInt($("#full-stride").value || "30", 10));
   const maxFrames = Math.max(1, parseInt($("#full-max").value || "400", 10));
   try {
-    const r = await fetch(apiUrl(`/api/video/${state.videoId}/analyze-full`), {
+    let r = await fetch(apiUrl(`/api/video/${state.videoId}/analyze-full`), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ frame_stride: stride, max_frames: maxFrames }),
     });
-    const text = await r.text();
+    let text = await r.text();
     let j = {};
     try {
       if (text) j = JSON.parse(text);
     } catch (_) {}
+    if (!r.ok && r.status === 404) {
+      r = await fetch(apiUrl("/api/analyze-full"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          video_id: state.videoId,
+          frame_stride: stride,
+          max_frames: maxFrames,
+        }),
+      });
+      text = await r.text();
+      j = {};
+      try {
+        if (text) j = JSON.parse(text);
+      } catch (_) {}
+    }
     if (!r.ok) throw new Error(httpErrorMessage(r, j, text));
 
     const mi = j.model_info || {};

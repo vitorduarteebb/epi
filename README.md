@@ -25,6 +25,8 @@ Abre no browser: `http://SEU_IP:8090` (na VPS abre também a porta **8090** no f
 
 **404 mesmo em `http://IP:8090/api/...`:** a porta 8090 está ocupada por **outro programa** ou um uvicorn **antigo/errado**. Na VPS: `ss -tlnp | grep 8090` e `curl -s http://127.0.0.1:8090/api/health` — tem de ser JSON com `"service":"epi-web"`. Se `curl http://127.0.0.1:8090/openapi.json` falhar, não é esta app. Mata o processo na 8090 (`fuser -k 8090/tcp`) e volta a arrancar só `python -m uvicorn webapp.app:app --host 0.0.0.0 --port 8090` em `/opt/epi`. Opcional: copia `deploy/epi-web.service` para `/etc/systemd/system/`, `systemctl daemon-reload`, `systemctl enable --now epi-web`.
 
+**404 no browser mas `curl 127.0.0.1` na VPS funciona:** firewall, proxy ou WAF a bloquear certos caminhos para IPs externos. O painel tenta rotas alternativas: `GET /api/metrics` (igual a `/api/stats`), `GET /api/model` (igual a `/api/model-info`), `POST /api/analyze-full` com JSON `{ "video_id", "frame_stride", "max_frames" }` (igual ao POST com UUID no URL). Testa no teu PC: `curl -s http://IP:8090/api/metrics`.
+
 O painel de **Treino** mostra: taxa de acerto global, totais (correto/incorreto), tendência nos últimos até 50 registos, gráfico de atividade por dia, tabela por vídeo e histórico recente — dados vêm de `data/web_feedback.db` (endpoint `GET /api/stats`).
 
 Em cada frame, o quadro **«O que a IA está a dizer»** explica em português: com **yolov8n** (COCO) só aparecem pessoas/objetos genéricos — **não** mede capacete/colete; com um `models/ppe.pt` treinado para EPI, o texto reflete classes como «sem capacete», etc.

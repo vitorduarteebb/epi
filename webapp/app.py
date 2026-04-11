@@ -72,6 +72,31 @@ class AnalyzeFullBody(BaseModel):
     max_frames: int = Field(default=400, ge=1, le=5000)
 
 
+class AnalyzeFullBodyWithVideoId(BaseModel):
+    """Mesmo que POST /api/video/{id}/analyze-full, mas sem UUID no caminho (útil atrás de WAF)."""
+
+    video_id: str = Field(min_length=8)
+    frame_stride: int = Field(default=30, ge=1, le=600)
+    max_frames: int = Field(default=400, ge=1, le=5000)
+
+
+def _run_analyze_full(video_id: str, frame_stride: int, max_frames: int) -> dict[str, Any]:
+    row = db.get_video(video_id)
+    if not row:
+        raise HTTPException(404, "Vídeo não encontrado")
+    path = Path(row["path"])
+    if not path.is_file():
+        raise HTTPException(404, "Ficheiro em falta no disco")
+    try:
+        report = analyze_full_video(path, frame_stride=frame_stride, max_frames=max_frames)
+    except RuntimeError as e:
+        raise HTTPException(400, str(e)) from e
+    except Exception as e:
+        log.exception("analyze-full")
+        raise HTTPException(500, str(e)) from e
+    return report
+
+
 @app.post("/api/upload")
 async def upload_video(file: UploadFile = File(...)) -> JSONResponse:
     if not file.filename:
@@ -108,8 +133,23 @@ def training_stats() -> JSONResponse:
     return JSONResponse(db.get_training_stats())
 
 
+@app.get("/api/metrics")
+def training_stats_metrics_alias() -> JSONResponse:
+    """Alias de /api/stats — alguns proxies bloqueiam o segmento «stats» no URL."""
+    return JSONResponse(db.get_training_stats())
+
+
 @app.get("/api/model-info")
 def model_info() -> JSONResponse:
+    try:
+        return JSONResponse(get_model_info())
+    except Exception as e:
+        raise HTTPException(500, str(e)) from e
+
+
+@app.get("/api/model")
+def model_info_alias() -> JSONResponse:
+    """Alias de /api/model-info — caminho mais curto."""
     try:
         return JSONResponse(get_model_info())
     except Exception as e:
@@ -163,22 +203,15 @@ def analyze_video_full(
     body: AnalyzeFullBody = AnalyzeFullBody(),
 ) -> JSONResponse:
     """Amostra o vídeo inteiro e devolve um relatório agregado (não só um frame)."""
-    row = db.get_video(video_id)
-    if not row:
-        raise HTTPException(404, "Vídeo não encontrado")
-    path = Path(row["path"])
-    if not path.is_file():
-        raise HTTPException(404, "Ficheiro em falta no disco")
-    stride = body.frame_stride
-    mxf = body.max_frames
-    try:
-        report = analyze_full_video(path, frame_stride=stride, max_frames=mxf)
-    except RuntimeError as e:
-        raise HTTPException(400, str(e)) from e
-    except Exception as e:
-        log.exception("analyze-full")
-        raise HTTPException(500, str(e)) from e
-    return JSONResponse(report)
+    return JSONResponse(_run_analyze_full(video_id, body.frame_stride, body.max_frames))
+
+
+@app.post("/api/analyze-full")
+def analyze_video_full_no_uuid_in_path(body: AnalyzeFullBodyWithVideoId) -> JSONResponse:
+    """Igual a POST /api/video/{id}/analyze-full, mas o id vai no corpo JSON."""
+    return JSONResponse(
+        _run_analyze_full(body.video_id, body.frame_stride, body.max_frames),
+    )
 
 
 @app.post("/api/video/{video_id}/feedback")
