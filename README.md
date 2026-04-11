@@ -16,6 +16,8 @@ Não cole o YAML no terminal (o bash tenta executar como comandos). Edite o fich
 cd /opt/epi && source .venv/bin/activate && python scripts/ativar_fallback_teste.py && python -m src.main
 ```
 
+O script descarrega um `.mp4` para `samples/video_teste.mp4` e define essa rota na primeira câmera (substitui o RTSP de exemplo que a VPS não consegue abrir). Só modelo, sem trocar URL: `python scripts/ativar_fallback_teste.py --sem-video`.
+
 1. Copie `config.example.yaml` para `config.yaml` (o script acima cria se faltar).
 2. **Teste só o pipeline (sem modelo EPI):** `model.fallback_yolov8n: true` (baixa `yolov8n.pt` na primeira execução).
 3. **Produção:** envie `models/ppe.pt` (SCP) e use `fallback_yolov8n: false` + classes corretas em `detection`.
