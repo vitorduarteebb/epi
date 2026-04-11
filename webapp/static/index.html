@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Monitor EPI — Treino &amp; Tempo real</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <header>
+    <h1>Monitor EPI</h1>
+    <span class="badge">Painel local · sem APIs de IA externas</span>
+  </header>
+  <nav>
+    <button type="button" class="active" data-tab="train">Treino (vídeo)</button>
+    <button type="button" data-tab="live">Tempo real (câmera)</button>
+  </nav>
+  <main>
+    <section id="panel-train" class="panel active">
+      <div class="card">
+        <h2>1. Enviar vídeo</h2>
+        <form id="upload-form">
+          <label>Ficheiro (mp4, avi, mkv, mov, webm)</label>
+          <input id="file-input" type="file" accept="video/*" />
+          <button type="submit" class="primary">Enviar</button>
+        </form>
+        <p id="upload-msg" class="msg"></p>
+      </div>
+      <div class="card">
+        <h2>2. Escolher vídeo e frame</h2>
+        <p class="msg">Clique num vídeo na lista. Carregue frames e diga se a deteção está certa — os dados ficam na base local (<code>data/web_feedback.db</code>) para futuras exportações / retreino.</p>
+        <ul id="video-list" class="video-list"></ul>
+        <div class="row">
+          <div>
+            <label>Índice do frame (saltar de 5 em 5 com os botões)</label>
+            <input id="frame-idx" type="number" min="0" value="0" />
+          </div>
+          <button type="button" class="ghost" id="btn-prev">− 5</button>
+          <button type="button" class="ghost" id="btn-next">+ 5</button>
+          <button type="button" class="primary" id="btn-load-frame">Carregar frame</button>
+        </div>
+        <img id="preview" class="preview" alt="Pré-visualização" />
+        <p id="train-msg" class="msg"></p>
+        <div class="row">
+          <label>Notas (opcional)</label>
+          <input id="notes" type="text" placeholder="Ex.: capacete não visível" />
+        </div>
+        <div class="row">
+          <button type="button" class="primary" id="btn-ok" style="background: var(--ok)">Correto</button>
+          <button type="button" class="danger" id="btn-bad">Incorreto</button>
+        </div>
+        <h2>Deteções (JSON)</h2>
+        <pre id="detections-json" class="det-json">[]</pre>
+      </div>
+      <div class="card">
+        <h2>Último feedback</h2>
+        <div id="feedback-list"></div>
+      </div>
+    </section>
+    <section id="panel-live" class="panel">
+      <div class="card">
+        <h2>Stream em tempo real</h2>
+        <p class="msg">Cole a URL RTSP do NVR/câmera ou um caminho absoluto para um ficheiro .mp4 na máquina (ex.: <code>/opt/epi/samples/video_teste.mp4</code>). O servidor lê o vídeo e aplica o modelo YOLO localmente.</p>
+        <label>URL RTSP ou caminho do ficheiro</label>
+        <input id="live-url" type="text" placeholder="rtsp://usuario:senha@IP:554/..." />
+        <div class="row">
+          <button type="button" class="primary" id="btn-live-start">Iniciar</button>
+          <button type="button" class="ghost" id="btn-live-stop">Parar</button>
+        </div>
+        <p id="live-msg" class="msg"></p>
+      </div>
+      <div class="card live-wrap">
+        <img id="live-img" alt="Tempo real" />
+      </div>
+    </section>
+  </main>
+  <script src="/static/app.js"></script>
+</body>
+</html>

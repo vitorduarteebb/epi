@@ -8,3 +8,6 @@ config.yaml
 logs/
 models/*.pt
 .env
+data/web_uploads/*
+!data/web_uploads/.gitkeep
+data/web_feedback.db

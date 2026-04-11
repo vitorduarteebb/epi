@@ -2,6 +2,24 @@
 
 Serviço em Python que lê streams RTSP (NVR/câmeras IP), executa detecção com modelo YOLOv8 (`.pt`) e dispara alertas (log, arquivo, webhook opcional).
 
+## Painel web (treino + tempo real)
+
+Interface **local** (FastAPI) — sem chamadas a APIs de IA na nuvem: o modelo corre na tua máquina/VPS.
+
+- **Treino:** envia vídeos, vê deteções frame a frame e marca **Correto** / **Incorreto** (grava em SQLite para futura exportação/retreino).
+- **Tempo real:** indica URL RTSP ou caminho de um `.mp4` no servidor; vê o fluxo com caixas desenhadas (MJPEG).
+
+Na raiz do projeto, com `config.yaml` e venv ativo:
+
+```bash
+pip install -r requirements.txt
+python -m uvicorn webapp.app:app --host 0.0.0.0 --port 8090
+```
+
+Abre no browser: `http://SEU_IP:8090` (na VPS abre também a porta **8090** no firewall / painel do hosting).
+
+O monitor em linha de comando (`python -m src.main`) e o painel são **serviços separados**; podes usar só um deles ou os dois (portas diferentes: 8080 health do CLI vs 8090 painel).
+
 ## Uso rápido
 
 1. Copie `config.example.yaml` para `config.yaml` e configure URLs RTSP + caminho do modelo em `models/ppe.pt`.
