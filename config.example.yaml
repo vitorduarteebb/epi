@@ -47,3 +47,9 @@ alerts:
   # Opcional: enviar POST JSON para seu sistema (n8n, webhook, API interna)
   webhook_url: null
   # webhook_url: "https://seu-servidor.com/api/epi-alerta"
+
+# Página simples e /health no browser (use http://IP:8080/ — não há site na porta 80 por defeito)
+http:
+  enabled: true
+  host: "0.0.0.0"
+  port: 8080

@@ -20,6 +20,7 @@ from dotenv import load_dotenv
 
 from src.alerts import AlertService, AlertState
 from src.config_loader import load_config
+from src.http_health import start_http_server
 from src.ppe_detector import PPEDetector
 from src.rules import check_missing_when_person, check_violation
 from src.stream_reader import FrameGrabber
@@ -144,6 +145,27 @@ def main() -> int:
     if not cameras:
         log.error("Nenhuma câmera habilitada em config.yaml.")
         return 1
+
+    http_cfg = cfg.get("http") or {}
+    if http_cfg.get("enabled", True):
+        host = str(http_cfg.get("host", "0.0.0.0"))
+        port = int(http_cfg.get("port", 8080))
+
+        def _status() -> dict:
+            return {
+                "ok": True,
+                "service": "epi-monitor",
+                "cameras": len(cameras),
+            }
+
+        try:
+            start_http_server(host, port, _status)
+        except OSError as e:
+            log.warning(
+                "Servidor HTTP não iniciado (%s). Abra a porta no ufw e no painel do hosting. "
+                "Ou desative com http.enabled: false no config.yaml.",
+                e,
+            )
 
     infer_lock = threading.Lock()
     threads: list[threading.Thread] = []

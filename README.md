@@ -38,6 +38,23 @@ Em `cameras` → `url` use o caminho absoluto (ex.: `"/opt/epi/samples/video_tes
 
 3. `python -m src.main` — o vídeo repete em loop para o pipeline processar continuamente.
 
+## Abrir no browser (health check)
+
+O monitor **não** usa a porta 80 por defeito. Com o serviço a correr (`python -m src.main`), abre:
+
+**`http://SEU_IP:8080/`** (página simples) ou **`http://SEU_IP:8080/health`** (JSON).
+
+Na VPS:
+
+```bash
+ufw allow 8080/tcp
+ufw reload
+```
+
+No **painel do hosting** (Hostinger, etc.), abre também a porta **8080** nas regras de firewall / rede — o `ufw` sozinho não chega se o provedor bloquear tráfego de entrada.
+
+Para desativar o HTTP: em `config.yaml`, `http.enabled: false`.
+
 ## VPS
 
 Clone, venv, `pip install -r requirements.txt`, editar `config.yaml`, `python -m src.main`.
