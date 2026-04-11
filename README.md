@@ -20,6 +20,8 @@ Abre no browser: `http://SEU_IP:8090` (na VPS abre também a porta **8090** no f
 
 O painel de **Treino** mostra: taxa de acerto global, totais (correto/incorreto), tendência nos últimos até 50 registos, gráfico de atividade por dia, tabela por vídeo e histórico recente — dados vêm de `data/web_feedback.db` (endpoint `GET /api/stats`).
 
+Em cada frame, o quadro **«O que a IA está a dizer»** explica em português: com **yolov8n** (COCO) só aparecem pessoas/objetos genéricos — **não** mede capacete/colete; com um `models/ppe.pt` treinado para EPI, o texto reflete classes como «sem capacete», etc.
+
 O monitor em linha de comando (`python -m src.main`) e o painel são **serviços separados**; podes usar só um deles ou os dois (portas diferentes: 8080 health do CLI vs 8090 painel).
 
 ## Uso rápido

@@ -47,6 +47,9 @@
           <span class="stat-hint">Acerto nos registos mais recentes</span>
         </article>
       </div>
+      <p class="kpi-footnote">
+        As percentagens sobem quando clicas em <strong>Correto</strong> ou <strong>Incorreto</strong> após cada frame — isso regista o teu juízo sobre a IA, não mede EPI sozinha.
+      </p>
 
       <div class="progress-global">
         <div class="progress-label"><span>Progresso da validação</span><span id="progress-pct">0%</span></div>
@@ -98,7 +101,16 @@
         <div class="col-right">
           <div class="card sticky-card">
             <h2><span class="step">3</span> Frame &amp; validação</h2>
-            <p class="lead small">Escolhe um vídeo à esquerda. Ajusta o índice do frame e carrega. Confirma se a IA acertou nas caixas.</p>
+            <p class="lead small">
+              Carrega um frame: lê o quadro <strong>O que a IA está a dizer</strong> (com/sem EPI só faz sentido com modelo treinado para EPI).
+              Depois diz se a deteção está <strong>Correto</strong> ou <strong>Incorreto</strong> para alimentar as métricas.
+            </p>
+            <div id="model-strip" class="model-strip" hidden></div>
+            <div id="insight-banner" class="insight-banner" hidden>
+              <strong class="insight-title"></strong>
+              <p class="insight-detail"></p>
+              <ul id="insight-lines" class="insight-lines"></ul>
+            </div>
             <div class="frame-controls">
               <label>Índice do frame</label>
               <div class="row tight">

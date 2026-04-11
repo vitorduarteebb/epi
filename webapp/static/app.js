@@ -32,6 +32,56 @@ function setPreviewHasImage(on) {
   else w.classList.remove("has-image");
 }
 
+function renderInsight(summary) {
+  const box = $("#insight-banner");
+  if (!summary || !summary.banner_title) {
+    box.hidden = true;
+    return;
+  }
+  box.hidden = false;
+  box.className = "insight-banner level-" + (summary.banner_level || "info");
+  box.querySelector(".insight-title").textContent = summary.banner_title;
+  box.querySelector(".insight-detail").textContent = summary.banner_detail || "";
+  const ul = $("#insight-lines");
+  ul.innerHTML = "";
+  (summary.lines || []).forEach((line) => {
+    const li = document.createElement("li");
+    li.textContent = line.text;
+    li.className =
+      "lvl-" + (line.level === "bad" ? "bad" : line.level === "ok" ? "ok" : "neutral");
+    ul.appendChild(li);
+  });
+}
+
+async function loadModelStrip() {
+  const strip = $("#model-strip");
+  try {
+    const r = await fetch("/api/model-info");
+    const m = await r.json();
+    if (!r.ok) return;
+    strip.hidden = false;
+    const fb = m.using_fallback_yolov8n ? " (fallback yolov8n)" : "";
+    strip.innerHTML =
+      "<strong>Modelo:</strong> <code>" +
+      escapeHtml(String(m.weights_effective || "?")) +
+      "</code>" +
+      escapeHtml(fb) +
+      " · <span class='model-hint'>" +
+      (m.class_names && Object.keys(m.class_names).length
+        ? "Classes: " +
+          escapeHtml(
+            Object.values(m.class_names)
+              .slice(0, 12)
+              .join(", ")
+          ) +
+          (Object.keys(m.class_names).length > 12 ? "…" : "")
+        : "") +
+      "</span>";
+  } catch (e) {
+    strip.hidden = true;
+  }
+}
+
 async function loadStats() {
   try {
     const r = await fetch("/api/stats");
@@ -173,6 +223,7 @@ async function loadFrame() {
     $("#train-msg").textContent = "Selecione um vídeo na lista.";
     setPreviewHasImage(false);
     $("#preview").removeAttribute("src");
+    $("#insight-banner").hidden = true;
     return;
   }
   const idx = parseInt($("#frame-idx").value || "0", 10);
@@ -187,6 +238,7 @@ async function loadFrame() {
     $("#preview").src = "data:image/jpeg;base64," + j.image_base64;
     setPreviewHasImage(true);
     $("#detections-json").textContent = JSON.stringify(j.detections || [], null, 2);
+    renderInsight(j.summary || null);
     $("#train-msg").textContent = `Frame ${j.frame_idx} / ~${j.total_frames} · ${(j.detections || []).length} deteção(ões)`;
   } catch (e) {
     $("#train-msg").textContent = "Erro: " + e.message;
@@ -324,6 +376,7 @@ $("#btn-live-stop").addEventListener("click", async () => {
 });
 
 (async function init() {
+  await loadModelStrip();
   await refreshVideos();
   await loadStats();
   setInterval(loadStats, 60000);

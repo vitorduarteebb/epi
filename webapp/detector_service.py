@@ -46,3 +46,34 @@ def get_detector() -> PPEDetector:
 def predict_frame(frame: Any) -> list[dict[str, Any]]:
     det = get_detector()
     return det.predict(frame)
+
+
+def get_model_info() -> dict[str, Any]:
+    """Metadados do YOLO carregado (pesos, nomes de classe) para o painel."""
+    from src.config_loader import load_config
+
+    cfg = load_config()
+    mcfg = cfg.get("model", {})
+    weights = mcfg.get("weights", "models/ppe.pt")
+    path = Path(weights)
+    using_fallback = bool(mcfg.get("fallback_yolov8n")) and not path.is_file()
+    effective = "yolov8n.pt" if using_fallback else str(weights)
+
+    det = get_detector()
+    yolo = det._model
+    names: dict[int, str] = {}
+    raw = getattr(yolo, "names", None)
+    if isinstance(raw, dict):
+        names = {int(k): str(v) for k, v in raw.items()}
+    elif raw is not None:
+        try:
+            names = {i: str(n) for i, n in enumerate(raw)}
+        except TypeError:
+            names = {}
+
+    return {
+        "weights_configured": weights,
+        "weights_effective": effective,
+        "using_fallback_yolov8n": using_fallback,
+        "class_names": names,
+    }

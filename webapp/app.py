@@ -14,7 +14,8 @@ from pydantic import BaseModel, Field
 
 from webapp import db
 from webapp import live_session
-from webapp.detector_service import predict_frame
+from webapp.detection_summary import build_summary
+from webapp.detector_service import get_model_info, predict_frame
 from webapp.video_util import draw_detections, encode_jpeg, read_frame
 
 logging.basicConfig(level=logging.INFO)
@@ -95,6 +96,14 @@ def training_stats() -> JSONResponse:
     return JSONResponse(db.get_training_stats())
 
 
+@app.get("/api/model-info")
+def model_info() -> JSONResponse:
+    try:
+        return JSONResponse(get_model_info())
+    except Exception as e:
+        raise HTTPException(500, str(e)) from e
+
+
 @app.get("/api/video/{video_id}/frame/{frame_idx}")
 def get_frame(video_id: str, frame_idx: int) -> JSONResponse:
     row = db.get_video(video_id)
@@ -108,6 +117,13 @@ def get_frame(video_id: str, frame_idx: int) -> JSONResponse:
         raise HTTPException(400, "Não foi possível ler o frame")
     try:
         dets = predict_frame(frame)
+        minfo = get_model_info()
+        summary = build_summary(
+            dets,
+            minfo.get("class_names"),
+            bool(minfo.get("using_fallback_yolov8n")),
+            str(minfo.get("weights_effective", "")),
+        )
     except Exception as e:
         raise HTTPException(500, str(e)) from e
     vis = draw_detections(frame, dets)
@@ -119,6 +135,12 @@ def get_frame(video_id: str, frame_idx: int) -> JSONResponse:
             "total_frames": total,
             "detections": dets,
             "image_base64": b64,
+            "summary": summary,
+            "model_info": {
+                "weights_effective": minfo.get("weights_effective"),
+                "using_fallback_yolov8n": minfo.get("using_fallback_yolov8n"),
+                "model_epi_capable": summary.get("model_epi_capable"),
+            },
         }
     )
 
