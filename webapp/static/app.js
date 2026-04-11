@@ -19,6 +19,45 @@ function errDetail(err) {
   return String(err);
 }
 
+/**
+ * Base da API (uvicorn). Por defeito usa caminhos relativos (mesmo host/porta que o HTML).
+ * Se abrires o site na porta 80 e o FastAPI só estiver na 8090, define antes de app.js:
+ *   window.__EPI_API_BASE__ = "http://SEU_IP:8090"
+ * ou no index.html: <meta name="epi-api-base" content="http://SEU_IP:8090" />
+ */
+function getApiBase() {
+  if (typeof window !== "undefined" && window.__EPI_API_BASE__) {
+    return String(window.__EPI_API_BASE__).replace(/\/$/, "");
+  }
+  const m = document.querySelector('meta[name="epi-api-base"]');
+  if (m && m.content && String(m.content).trim()) {
+    return String(m.content).trim().replace(/\/$/, "");
+  }
+  return "";
+}
+
+function apiUrl(path) {
+  const p = path.startsWith("/") ? path : "/" + path;
+  const b = getApiBase();
+  return b ? b + p : p;
+}
+
+/** Mensagem útil quando a API responde 404 (rota em falta vs recurso). */
+function httpErrorMessage(r, j, text) {
+  let msg = errDetail(j.detail || j) || (text || "").trim();
+  if (r.status === 404) {
+    if (msg === "Not Found" || !msg) {
+      return (
+        "404: esta origem não tem a API FastAPI (rota em falta). " +
+        "Abre o painel diretamente em http://IP:8090 ou define no HTML " +
+        '<meta name="epi-api-base" content="http://IP:8090"> se o site estiver noutra porta. ' +
+        "Na VPS: git pull + reinicia o uvicorn."
+      );
+    }
+  }
+  return msg || "HTTP " + r.status;
+}
+
 let state = {
   videoId: null,
   frameIdx: 0,
@@ -130,7 +169,7 @@ async function loadModelStrip() {
   if (!apiServerOk) return;
   const strip = $("#model-strip");
   try {
-    const r = await fetch("/api/model-info");
+    const r = await fetch(apiUrl("/api/model-info"));
     const m = await r.json();
     if (!r.ok) return;
     strip.hidden = false;
@@ -158,7 +197,7 @@ async function loadModelStrip() {
 
 async function verifyApiServer() {
   try {
-    const r = await fetch("/api/health");
+    const r = await fetch(apiUrl("/api/health"));
     if (r.ok) {
       apiServerOk = true;
       return true;
@@ -175,9 +214,16 @@ async function verifyApiServer() {
 async function loadStats() {
   if (!apiServerOk) return;
   try {
-    const r = await fetch("/api/stats");
-    const s = await r.json();
-    if (!r.ok) throw new Error(errDetail(s));
+    const r = await fetch(apiUrl("/api/stats"));
+    const text = await r.text();
+    let s = {};
+    try {
+      if (text) s = JSON.parse(text);
+    } catch (_) {}
+    if (!r.ok) {
+      console.error(httpErrorMessage(r, s, text));
+      return;
+    }
 
     const acc = s.accuracy_percent;
     $("#kpi-accuracy").textContent = acc == null ? "—" : `${acc}%`;
@@ -279,7 +325,7 @@ function renderRecentTable(items) {
 }
 
 async function refreshVideos() {
-  const r = await fetch("/api/videos");
+  const r = await fetch(apiUrl("/api/videos"));
   const j = await r.json();
   const ul = $("#video-list");
   ul.innerHTML = "";
@@ -323,7 +369,7 @@ async function loadFrame() {
   state.frameIdx = idx;
   $("#train-msg").textContent = "A carregar frame…";
   try {
-    const r = await fetch(`/api/video/${state.videoId}/frame/${idx}`);
+    const r = await fetch(apiUrl(`/api/video/${state.videoId}/frame/${idx}`));
     const j = await r.json();
     if (!r.ok) throw new Error(errDetail(j.detail || j));
     state.totalFrames = j.total_frames || 0;
@@ -362,13 +408,17 @@ async function analyzeFullVideo() {
   const stride = Math.max(1, parseInt($("#full-stride").value || "30", 10));
   const maxFrames = Math.max(1, parseInt($("#full-max").value || "400", 10));
   try {
-    const r = await fetch(`/api/video/${state.videoId}/analyze-full`, {
+    const r = await fetch(apiUrl(`/api/video/${state.videoId}/analyze-full`), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ frame_stride: stride, max_frames: maxFrames }),
     });
-    const j = await r.json();
-    if (!r.ok) throw new Error(errDetail(j.detail || j));
+    const text = await r.text();
+    let j = {};
+    try {
+      if (text) j = JSON.parse(text);
+    } catch (_) {}
+    if (!r.ok) throw new Error(httpErrorMessage(r, j, text));
 
     const mi = j.model_info || {};
     const fb = mi.using_fallback_yolov8n ? " (modelo COCO / fallback)" : "";
@@ -423,7 +473,7 @@ $("#btn-next").addEventListener("click", () => {
 async function sendFeedback(approved) {
   if (!state.videoId) return;
   $("#train-msg").classList.remove("error");
-  const r = await fetch(`/api/video/${state.videoId}/feedback`, {
+  const r = await fetch(apiUrl(`/api/video/${state.videoId}/feedback`), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -496,7 +546,7 @@ $("#upload-form").addEventListener("submit", async (e) => {
   fd.append("file", f);
   $("#upload-msg").textContent = "A enviar…";
   $("#upload-msg").classList.remove("error");
-  const r = await fetch("/api/upload", { method: "POST", body: fd });
+  const r = await fetch(apiUrl("/api/upload"), { method: "POST", body: fd });
   const j = await r.json();
   if (!r.ok) {
     $("#upload-msg").textContent = errDetail(j.detail) || "Erro no upload";
@@ -522,7 +572,7 @@ $("#btn-live-start").addEventListener("click", async () => {
   const url = $("#live-url").value.trim();
   if (!url) return;
   $("#live-msg").textContent = "A iniciar…";
-  const r = await fetch("/api/live/start", {
+  const r = await fetch(apiUrl("/api/live/start"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ url }),
@@ -533,11 +583,11 @@ $("#btn-live-start").addEventListener("click", async () => {
     return;
   }
   $("#live-msg").textContent = "Em curso. Stream abaixo.";
-  $("#live-img").src = "/api/live/mjpeg?t=" + Date.now();
+  $("#live-img").src = apiUrl("/api/live/mjpeg") + "?t=" + Date.now();
 });
 
 $("#btn-live-stop").addEventListener("click", async () => {
-  await fetch("/api/live/stop", { method: "POST" });
+  await fetch(apiUrl("/api/live/stop"), { method: "POST" });
   $("#live-img").removeAttribute("src");
   $("#live-msg").textContent = "Parado.";
 });

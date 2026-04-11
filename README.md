@@ -21,6 +21,8 @@ Abre no browser: `http://SEU_IP:8090` (na VPS abre também a porta **8090** no f
 
 **Se no browser vires 404 em `/api/stats` ou `/api/model-info`:** o processo na porta 8090 **não** é o uvicorn deste painel. Exemplos típicos: `python -m http.server 8090` (só ficheiros estáticos), ou nginx a servir HTML sem fazer **proxy** de `/api` e `/static` para o uvicorn. Solução: na raiz do projeto, com venv ativo, `python -m uvicorn webapp.app:app --host 0.0.0.0 --port 8090`. Confirma com `curl http://127.0.0.1:8090/api/health` — deve devolver JSON com `service: epi-web`.
 
+**Se abrires o site na porta 80 (ou outra) mas o uvicorn só na 8090:** os `fetch` para `/api/...` vão bater no servidor da porta 80 e dão 404. Ou fazes **proxy** no nginx de `/`, `/static` e `/api` para `127.0.0.1:8090`, ou abres diretamente `http://SEU_IP:8090`, ou no `index.html` defines `<meta name="epi-api-base" content="http://SEU_IP:8090" />` (sem barra no fim) para o JavaScript chamar a API na porta certa.
+
 O painel de **Treino** mostra: taxa de acerto global, totais (correto/incorreto), tendência nos últimos até 50 registos, gráfico de atividade por dia, tabela por vídeo e histórico recente — dados vêm de `data/web_feedback.db` (endpoint `GET /api/stats`).
 
 Em cada frame, o quadro **«O que a IA está a dizer»** explica em português: com **yolov8n** (COCO) só aparecem pessoas/objetos genéricos — **não** mede capacete/colete; com um `models/ppe.pt` treinado para EPI, o texto reflete classes como «sem capacete», etc.

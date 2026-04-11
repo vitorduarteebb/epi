@@ -4,6 +4,8 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#0c1017" />
+  <!-- Se o site abrir na porta 80/443 mas o uvicorn só na 8090, define a URL do FastAPI (sem / no fim): -->
+  <meta name="epi-api-base" content="" />
   <title>Monitor EPI — Treino &amp; Tempo real</title>
   <link rel="icon" href="/static/favicon.svg" type="image/svg+xml" />
   <link rel="stylesheet" href="/static/styles.css" />
@@ -202,6 +204,9 @@
   <footer class="site-footer">
     <span>Dados em <code>data/web_feedback.db</code> · sem APIs de IA na nuvem</span>
   </footer>
+  <!-- Opcional: força a API para a porta 8090 quando o HTML é servido por nginx noutra porta
+  <script>window.__EPI_API_BASE__ = location.protocol + "//" + location.hostname + ":8090";</script>
+  -->
   <script src="/static/app.js"></script>
 </body>
 </html>
