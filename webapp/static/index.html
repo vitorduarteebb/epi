@@ -2,7 +2,8 @@
 <html lang="pt">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0c1017" />
   <title>Monitor EPI — Treino &amp; Tempo real</title>
   <link rel="icon" href="/static/favicon.svg" type="image/svg+xml" />
   <link rel="stylesheet" href="/static/styles.css" />
@@ -121,6 +122,10 @@
               <strong class="insight-title"></strong>
               <p class="insight-detail"></p>
               <ul id="insight-lines" class="insight-lines"></ul>
+            </div>
+            <div id="epi-alert-strip" class="epi-alert-strip" hidden role="status">
+              <span class="epi-alert-icon" aria-hidden="true"></span>
+              <p class="epi-alert-text"></p>
             </div>
             <div class="frame-controls">
               <label>Índice do frame</label>

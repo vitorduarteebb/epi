@@ -65,6 +65,67 @@ function renderInsight(summary) {
   });
 }
 
+/**
+ * Faixa visível: alerta vermelho se modelo EPI e há sem_epi / hint_bad;
+ * aviso âmbar se modelo COCO e há pessoas (não há alerta «sem EPI» real).
+ */
+function renderEpiAlert(summary, modelInfo) {
+  const strip = $("#epi-alert-strip");
+  if (!strip) return;
+  const iconEl = strip.querySelector(".epi-alert-icon");
+  const textEl = strip.querySelector(".epi-alert-text");
+  if (!textEl) return;
+
+  if (!summary) {
+    strip.hidden = true;
+    return;
+  }
+
+  const counts = summary.counts || {};
+  const sem = Number(counts.sem_epi || 0);
+  const pessoas = Number(counts.pessoa || 0);
+  const hintBad = Number(counts.hint_bad || 0);
+  const capable =
+    summary.model_epi_capable === true ||
+    (modelInfo && modelInfo.model_epi_capable === true);
+
+  strip.className = "epi-alert-strip";
+  strip.hidden = false;
+
+  if (capable && (sem > 0 || hintBad > 0)) {
+    strip.classList.add("alert-danger");
+    if (iconEl) iconEl.textContent = "🚨";
+    const n = sem > 0 ? sem : hintBad;
+    textEl.textContent =
+      "Alerta: " +
+      n +
+      " indício(s) de possível falta de EPI neste frame. Confirma na imagem antes de validar.";
+    return;
+  }
+
+  const fallback =
+    summary.using_fallback_yolov8n === true ||
+    (modelInfo && modelInfo.using_fallback_yolov8n === true);
+  if (!capable && pessoas > 0) {
+    strip.classList.add("alert-warn");
+    if (iconEl) iconEl.textContent = "ℹ️";
+    textEl.textContent =
+      "Sem alerta «pessoas sem EPI»: este modelo (" +
+      (fallback ? "COCO / yolov8n" : "genérico") +
+      ") detetou " +
+      pessoas +
+      " pessoa(s) mas não classifica EPI. Para alertas reais, usa um modelo treinado (ex.: models/ppe.pt).";
+    return;
+  }
+
+  strip.hidden = true;
+}
+
+function hideEpiAlert() {
+  const strip = $("#epi-alert-strip");
+  if (strip) strip.hidden = true;
+}
+
 async function loadModelStrip() {
   if (!apiServerOk) return;
   const strip = $("#model-strip");
@@ -255,6 +316,7 @@ async function loadFrame() {
     $("#preview").removeAttribute("src");
     $("#insight-banner").hidden = true;
     $("#frame-headline").hidden = true;
+    hideEpiAlert();
     return;
   }
   const idx = parseInt($("#frame-idx").value || "0", 10);
@@ -270,6 +332,7 @@ async function loadFrame() {
     setPreviewHasImage(true);
     $("#detections-json").textContent = JSON.stringify(j.detections || [], null, 2);
     renderInsight(j.summary || null);
+    renderEpiAlert(j.summary || null, j.model_info || null);
     $("#train-msg").textContent = `Frame ${j.frame_idx} / ~${j.total_frames} · ${(j.detections || []).length} deteção(ões)`;
   } catch (e) {
     $("#train-msg").textContent = "Erro: " + e.message;
@@ -277,6 +340,7 @@ async function loadFrame() {
     setPreviewHasImage(false);
     $("#frame-headline").hidden = true;
     $("#insight-banner").hidden = true;
+    hideEpiAlert();
   }
 }
 
@@ -312,10 +376,22 @@ async function analyzeFullVideo() {
       ? `<p class="msg warn">Análise truncada: limite de ${j.max_frames_limit} inferências; aumenta o salto ou o máximo se precisares de mais cobertura.</p>`
       : "";
 
+    const agg = j.aggregated || {};
+    const semAgg = Number(agg.sem_epi || 0);
+    const pAgg = Number(agg.pessoa || 0);
+    const epiCap = mi.model_epi_capable === true;
+    let aggAlert = "";
+    if (epiCap && semAgg > 0) {
+      aggAlert = `<div class="full-report-alert-block danger" role="alert">🚨 Alerta (vídeo agregado): ${semAgg} ocorrência(s) de possível falta de EPI nas amostras. Revê os frames com deteção.</div>`;
+    } else if (!epiCap && pAgg > 0) {
+      aggAlert = `<div class="full-report-alert-block warn" role="status">ℹ️ Não há alerta «sem EPI» com este modelo: foram somadas ${pAgg} deteção(ões) de «pessoa» (a mesma pessoa pode repetir em vários frames). Para alertas de EPI, usa um modelo treinado (ppe.pt).</div>`;
+    }
+
     box.className = "full-report";
     box.innerHTML = `
       <h3 class="full-report-title">Relatório do vídeo completo</h3>
       <p class="full-report-meta"><code>${escapeHtml(String(mi.weights_effective || "?"))}</code>${escapeHtml(fb)} · ${j.frames_sampled} frame(s) amostrado(s) · stride ${j.frame_stride}</p>
+      ${aggAlert}
       <p class="full-report-main">${escapeHtml(j.report_pt || "")}</p>
       <p class="full-report-detail">${escapeHtml(j.detail_pt || "")}</p>
       ${trunc}
